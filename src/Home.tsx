@@ -4,32 +4,76 @@ import { useChatApi } from './hooks/useChatApi'
 import { useAuth0 } from '@auth0/auth0-react'
 
 interface Message {
+  id: string
   senderId: string
+  receiverId: string
   content: string
+  messageType: string
+  createdAt: string
+  readStatus: boolean
 }
 
 const Home = () => {
   // States to hold real-time messages
   const [realtimeMessages, setRealtimeMessages] = useState<Message[]>([])
   const [currentMessage, setCurrentMessage] = useState<string>('')
-  const { sendMessage, isAuthenticated } = useChatApi()
+  const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(true)
+
+  const { sendMessage, getChatHistory, isAuthenticated } = useChatApi()
   const { getAccessTokenSilently, user } = useAuth0()
 
-  // Use refs to store Pusher and channel instances across renders
   const pusherRef = useRef<Pusher | null>(null)
   const channelRef = useRef<ReturnType<Pusher['subscribe']> | null>(null)
 
-  // Pusher init
+  // useEffect for Pusher Init + Get History
   useEffect(() => {
-    const setupPusher = async () => {
-      if (pusherRef.current || !isAuthenticated || !user?.sub) {
+    let chatPartnerId: string | null = null
+    if (user?.sub) {
+      if (user.sub === 'google-oauth2|102141106120855017585') {
+        chatPartnerId = 'github|204113180'
+      } else if (user.sub === 'github|204113180') {
+        chatPartnerId = 'google-oauth2|102141106120855017585'
+      } else {
+        chatPartnerId = user.sub
+      }
+    }
+
+    const setupChat = async () => {
+      if (!isAuthenticated || !user?.sub || !chatPartnerId) {
         if (!isAuthenticated || !user?.sub) {
           console.log(
-            'Not authenticated or user ID missing. Pusher not initialised'
+            'Not authenticated or user ID missing. Chat features not initialised.'
           )
-        } else if (pusherRef.current) {
-          console.log('Pusher already initialised, skipping re-initialisation')
+        } else if (!chatPartnerId) {
+          console.log(
+            'Chat partner ID could not be determined. Chat history not loaded.'
+          )
         }
+        setIsLoadingHistory(false)
+        return
+      }
+
+      // Get chat history
+      if (isLoadingHistory) {
+        try {
+          console.log('Fetching chat history...')
+          const history = await getChatHistory(chatPartnerId)
+          history.sort(
+            (a, b) =>
+              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          )
+          setRealtimeMessages(history)
+          console.log('Chat history loaded:', history)
+        } catch (error) {
+          console.error('Failed to load chat history:', error)
+        } finally {
+          setIsLoadingHistory(false)
+        }
+      }
+
+      // Pusher init
+      if (pusherRef.current) {
+        console.log('Pusher already initialised, skipping re-initialisation')
         return
       }
 
@@ -40,7 +84,6 @@ const Home = () => {
           },
         })
 
-        // Initialize Pusher + store in ref
         pusherRef.current = new Pusher(import.meta.env.VITE_PUSHER_KEY, {
           cluster: import.meta.env.VITE_PUSHER_CLUSTER,
           channelAuthorization: {
@@ -57,10 +100,9 @@ const Home = () => {
           .replace(/\./g, '-')
         const privateChannelName = `private-chat-${sanitizedUserSub}`
 
-        // Subscribe to channel and store in ref
         channelRef.current = pusherRef.current.subscribe(privateChannelName)
 
-        // Bind event listeners
+        // History + real-time
         channelRef.current.bind('new-message', (data: Message) => {
           console.log('New message received via private Pusher channel:', data)
           setRealtimeMessages((prevMessages) => [...prevMessages, data])
@@ -92,7 +134,7 @@ const Home = () => {
       }
     }
 
-    setupPusher()
+    setupChat()
 
     // Cleanup function
     return () => {
@@ -104,16 +146,21 @@ const Home = () => {
         if (sanitizedUserSub) {
           pusherRef.current?.unsubscribe(`private-chat-${sanitizedUserSub}`)
         }
-        channelRef.current = null // Clear the ref
+        channelRef.current = null
       }
       if (pusherRef.current) {
-        // Disconnect the Pusher instance
         pusherRef.current.disconnect()
         pusherRef.current = null
       }
       console.log('Pusher client cleanup complete')
     }
-  }, [isAuthenticated, user?.sub, getAccessTokenSilently])
+  }, [
+    isAuthenticated,
+    user?.sub,
+    getAccessTokenSilently,
+    getChatHistory,
+    isLoadingHistory,
+  ])
 
   // Handle message sending
   const handleSendMessage = async (event: React.FormEvent) => {
@@ -128,28 +175,45 @@ const Home = () => {
       return
     }
 
+    let targetReceiverId = ''
+    if (user.sub === 'google-oauth2|102141106120855017585') {
+      targetReceiverId = 'github|204113180'
+    } else if (user.sub === 'github|204113180') {
+      targetReceiverId = 'google-oauth2|102141106120855017585'
+    } else {
+      console.warn('Unknown user, sending message to self for now')
+      targetReceiverId = user.sub
+    }
+
     try {
-      let targetReceiverId = ''
-
-      if (user.sub === 'google-oauth2|102141106120855017585') {
-        targetReceiverId = 'github|204113180'
-      } else if (user.sub === 'github|204113180') {
-        targetReceiverId = 'google-oauth2|102141106120855017585'
-      } else {
-        console.warn('Unknown user, sending message to self for now')
-        targetReceiverId = user.sub
-      }
-
-      await sendMessage({
+      const sentMessage = await sendMessage({
         receiverId: targetReceiverId,
         content: currentMessage,
       })
+      setRealtimeMessages((prevMessages) => [
+        ...prevMessages,
+        {
+          id: sentMessage.id,
+          senderId: sentMessage.sender_id || user.sub,
+          receiverId: sentMessage.receiver_id || targetReceiverId,
+          content: currentMessage,
+          messageType: sentMessage.message_type || 'text',
+          createdAt: sentMessage.created_at || new Date().toISOString(),
+          readStatus: sentMessage.read_status || false,
+        },
+      ])
       setCurrentMessage('')
       console.log('Message sent successfully!')
     } catch (error) {
       console.error('Failed to send message:', error)
       alert('Failed to send message. Please try again')
     }
+  }
+
+  // Helper to format date
+  const formatMessageTime = (isoString: string) => {
+    const date = new Date(isoString)
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
 
   return (
@@ -166,15 +230,39 @@ const Home = () => {
               {/* Real-time Messages Display */}
               <div className="mt-5 text-left max-h-56 overflow-y-auto border-t border-gray-300 pt-4">
                 <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                  Real-time Messages:
+                  Chat History & Real-time:
                 </h3>
-                {realtimeMessages.length === 0 ? (
+                {isLoadingHistory ? (
+                  <p className="text-gray-500">Loading chat history...</p>
+                ) : realtimeMessages.length === 0 ? (
                   <p className="text-gray-500">No messages yet...</p>
                 ) : (
                   <ul>
                     {realtimeMessages.map((msg, index) => (
-                      <li key={index} className="mb-1 text-gray-800">
-                        <strong>{msg.senderId}:</strong> {msg.content}
+                      <li
+                        key={msg.id || index}
+                        className={`mb-1 ${
+                          msg.senderId === user?.sub
+                            ? 'text-right'
+                            : 'text-left'
+                        }`}
+                      >
+                        <div
+                          className={`inline-block p-2 rounded-lg ${
+                            msg.senderId === user?.sub
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-gray-200 text-gray-800'
+                          }`}
+                          style={{ maxWidth: '80%' }}
+                        >
+                          <strong>
+                            {msg.senderId === user?.sub ? 'You' : msg.senderId}:
+                          </strong>{' '}
+                          {msg.content}
+                          <div className="text-xs opacity-75 mt-1">
+                            {formatMessageTime(msg.createdAt)}
+                          </div>
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -210,7 +298,9 @@ const Home = () => {
             </>
           ) : (
             // Message displayed when not logged in
-            <p className="text-gray-500 mt-4"></p>
+            <p className="text-gray-500 mt-4">
+              Please log in to start chatting.
+            </p>
           )}
         </div>
       </div>
