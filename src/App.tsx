@@ -1,3 +1,4 @@
+// src/App.tsx
 import { useAuth0 } from '@auth0/auth0-react'
 import { Routes, Route, Link } from 'react-router-dom'
 import Home from './Home'
@@ -20,66 +21,64 @@ function App() {
 
   return (
     <>
+      {/* Navbar + Auth0 actions */}
       <nav
-        className="navbar is-dark"
+        className="bg-gray-800 text-white p-4"
         role="navigation"
         aria-label="main navigation"
       >
-        <div className="navbar-brand">
-          <Link className="navbar-item" to="/">
-            <h1 className="title is-4 has-text-white">fono</h1>
-          </Link>
-        </div>
-        <div id="navbarBasicExample" className="navbar-menu">
-          <div className="navbar-start">
-            <Link className="navbar-item" to="/">
-              Home
+        <div className="container mx-auto flex items-center justify-between">
+          <div className="flex items-center">
+            <Link className="text-2xl font-bold text-white mr-6" to="/">
+              fono
             </Link>
-            {isAuthenticated && (
-              <Link className="navbar-item" to="/profile">
-                Profile
+            <div className="flex space-x-4">
+              <Link className="hover:text-gray-300" to="/">
+                Home
               </Link>
-            )}
-            {isAuthenticated && (
-              <Link className="navbar-item" to="/protected">
-                Protected
-              </Link>
-            )}
-          </div>
-          <div className="navbar-end">
-            <div className="navbar-item">
-              <div className="buttons">
-                {!isAuthenticated && (
-                  <button
-                    className="button is-primary"
-                    onClick={() => loginWithRedirect()}
-                  >
-                    Log In
-                  </button>
-                )}
-                {isAuthenticated && (
-                  <>
-                    <span className="navbar-item has-text-white">
-                      Hello, {user?.name || user?.nickname || 'User'}!
-                    </span>
-                    <button
-                      className="button is-light"
-                      onClick={() =>
-                        logout({
-                          logoutParams: { returnTo: window.location.origin },
-                        })
-                      }
-                    >
-                      Log Out
-                    </button>
-                  </>
-                )}
-              </div>
+              {isAuthenticated && (
+                <Link className="hover:text-gray-300" to="/profile">
+                  Profile
+                </Link>
+              )}
+              {isAuthenticated && (
+                <Link className="hover:text-gray-300" to="/protected">
+                  Protected
+                </Link>
+              )}
             </div>
+          </div>
+          <div className="flex items-center space-x-4">
+            {!isAuthenticated && (
+              <button
+                className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition duration-200"
+                onClick={() => loginWithRedirect()}
+              >
+                Log In
+              </button>
+            )}
+            {isAuthenticated && (
+              <>
+                <span className="text-white">
+                  Hello, {user?.name || user?.nickname || 'User'}!
+                </span>
+                <button
+                  className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition duration-200"
+                  onClick={() =>
+                    logout({
+                      logoutParams: { returnTo: window.location.origin },
+                    })
+                  }
+                >
+                  Log Out
+                </button>
+              </>
+            )}
           </div>
         </div>
       </nav>
 
+      {/* Routes */}
       <Routes>
         <Route path="/" element={<Home />} />
         <Route
