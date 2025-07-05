@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Pusher from 'pusher-js'
 import { useChatApi } from './hooks/useChatApi'
+import { useAuth0 } from '@auth0/auth0-react'
 
 interface Message {
   senderId: string
@@ -8,31 +9,111 @@ interface Message {
 }
 
 const Home = () => {
-  // State to hold real-time messages
+  // States to hold real-time messages
   const [realtimeMessages, setRealtimeMessages] = useState<Message[]>([])
   const [currentMessage, setCurrentMessage] = useState<string>('')
   const { sendMessage, isAuthenticated } = useChatApi()
+  const { getAccessTokenSilently, user } = useAuth0()
+
+  // Use refs to store Pusher and channel instances across renders
+  const pusherRef = useRef<Pusher | null>(null)
+  const channelRef = useRef<ReturnType<Pusher['subscribe']> | null>(null)
 
   // Pusher init
   useEffect(() => {
-    const pusher = new Pusher(import.meta.env.VITE_PUSHER_KEY, {
-      cluster: import.meta.env.VITE_PUSHER_CLUSTER,
-    })
+    const setupPusher = async () => {
+      if (pusherRef.current || !isAuthenticated || !user?.sub) {
+        if (!isAuthenticated || !user?.sub) {
+          console.log(
+            'Not authenticated or user ID missing. Pusher not initialised'
+          )
+        } else if (pusherRef.current) {
+          console.log('Pusher already initialised, skipping re-initialisation')
+        }
+        return
+      }
 
-    const channelName = 'public-chat'
-    const channel = pusher.subscribe(channelName)
+      try {
+        const accessToken = await getAccessTokenSilently({
+          authorizationParams: {
+            audience: import.meta.env.VITE_AUTH0_AUDIENCE,
+          },
+        })
 
-    channel.bind('new-message', (data: Message) => {
-      console.log('New message received via Pusher:', data)
-      setRealtimeMessages((prevMessages) => [...prevMessages, data])
-    })
+        // Initialize Pusher + store in ref
+        pusherRef.current = new Pusher(import.meta.env.VITE_PUSHER_KEY, {
+          cluster: import.meta.env.VITE_PUSHER_CLUSTER,
+          channelAuthorization: {
+            endpoint: 'http://localhost:3000/v1/pusher/auth',
+            transport: 'ajax',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          },
+        })
+
+        const sanitizedUserSub = user.sub
+          .replace(/\|/g, '_')
+          .replace(/\./g, '-')
+        const privateChannelName = `private-chat-${sanitizedUserSub}`
+
+        // Subscribe to channel and store in ref
+        channelRef.current = pusherRef.current.subscribe(privateChannelName)
+
+        // Bind event listeners
+        channelRef.current.bind('new-message', (data: Message) => {
+          console.log('New message received via private Pusher channel:', data)
+          setRealtimeMessages((prevMessages) => [...prevMessages, data])
+        })
+
+        channelRef.current.bind('pusher:subscription_succeeded', () => {
+          console.log(
+            `Successfully subscribed to private channel: ${privateChannelName}`
+          )
+        })
+
+        channelRef.current.bind(
+          'pusher:subscription_error',
+          (status: number) => {
+            console.error(
+              `Pusher subscription error on ${privateChannelName}:`,
+              status
+            )
+            if (status === 403) {
+              alert(
+                'Access denied to private chat channel. Please ensure you are logged in'
+              )
+            }
+          }
+        )
+        console.log('Pusher client setup complete')
+      } catch (error) {
+        console.error('Error setting up Pusher:', error)
+      }
+    }
+
+    setupPusher()
 
     // Cleanup function
     return () => {
-      pusher.unsubscribe(channelName)
-      pusher.disconnect()
+      if (channelRef.current) {
+        channelRef.current.unbind('new-message')
+        const sanitizedUserSub = user?.sub
+          ?.replace(/\|/g, '_')
+          .replace(/\./g, '-')
+        if (sanitizedUserSub) {
+          pusherRef.current?.unsubscribe(`private-chat-${sanitizedUserSub}`)
+        }
+        channelRef.current = null // Clear the ref
+      }
+      if (pusherRef.current) {
+        // Disconnect the Pusher instance
+        pusherRef.current.disconnect()
+        pusherRef.current = null
+      }
+      console.log('Pusher client cleanup complete')
     }
-  }, [])
+  }, [isAuthenticated, user?.sub, getAccessTokenSilently])
 
   // Handle message sending
   const handleSendMessage = async (event: React.FormEvent) => {
@@ -42,14 +123,27 @@ const Home = () => {
       return
     }
 
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !user?.sub) {
       alert('Please log in to send messages')
       return
     }
 
     try {
-      // Call API to send the message
-      await sendMessage({ receiverId: null, content: currentMessage })
+      let targetReceiverId = ''
+
+      if (user.sub === 'google-oauth2|102141106120855017585') {
+        targetReceiverId = 'github|204113180'
+      } else if (user.sub === 'github|204113180') {
+        targetReceiverId = 'google-oauth2|102141106120855017585'
+      } else {
+        console.warn('Unknown user, sending message to self for now')
+        targetReceiverId = user.sub
+      }
+
+      await sendMessage({
+        receiverId: targetReceiverId,
+        content: currentMessage,
+      })
       setCurrentMessage('')
       console.log('Message sent successfully!')
     } catch (error) {
