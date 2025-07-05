@@ -1,4 +1,3 @@
-// fono-frontend/src/hooks/useChatApi.ts
 import { useAuth0 } from '@auth0/auth0-react'
 import { useState, useEffect, useCallback } from 'react'
 import Pusher from 'pusher-js'
@@ -31,7 +30,10 @@ export function useChatApi(chatPartnerId: string) {
   const fetchChatHistory = useCallback(async () => {
     if (!isAuthenticated || !chatPartnerId) return
 
-    setLoading(true)
+    if (messages.length === 0) {
+      setLoading(true)
+    }
+
     try {
       const accessToken = await getAccessTokenSilently({
         authorizationParams: {
@@ -64,43 +66,62 @@ export function useChatApi(chatPartnerId: string) {
     } finally {
       setLoading(false)
     }
-  }, [isAuthenticated, chatPartnerId, getAccessTokenSilently])
+  }, [isAuthenticated, chatPartnerId, getAccessTokenSilently, messages.length])
 
-  const sendMessage = async (message: MessagePayload) => {
-    if (!isAuthenticated) {
-      throw new Error('User not authenticated to send message.')
-    }
+  const sendMessage = useCallback(
+    async (message: MessagePayload) => {
+      if (!isAuthenticated || !user) {
+        throw new Error('User not authenticated to send message.')
+      }
 
-    const accessToken = await getAccessTokenSilently({
-      authorizationParams: {
-        audience: import.meta.env.VITE_AUTH0_AUDIENCE,
-      },
-    })
+      // Create a message to show in the UI immediately
+      const optimisticMessage: Message = {
+        id: `temp-${Date.now()}`,
+        senderId: user.sub as string,
+        receiverId: message.receiverId as string,
+        content: message.content,
+        messageType: 'text',
+        createdAt: new Date().toISOString(),
+        readStatus: false,
+      }
 
-    const messageWithSender = {
-      ...message,
-      senderId: user?.sub,
-    }
+      // Update the UI instantly
+      setMessages((currentMessages) => [...currentMessages, optimisticMessage])
 
-    const response = await fetch(`${baseUrl}/chat_messages`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(messageWithSender),
-    })
+      // Send the real message to the server in the background
+      try {
+        const accessToken = await getAccessTokenSilently({
+          authorizationParams: {
+            audience: import.meta.env.VITE_AUTH0_AUDIENCE,
+          },
+        })
 
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(
-        `Failed to send message: ${response.status} - ${
-          errorData.message || 'Unknown error'
-        }`
-      )
-    }
-    // No need to process the response, Pusher will trigger a refresh
-  }
+        await fetch(`${baseUrl}/chat_messages`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            ...message,
+            senderId: user.sub,
+          }),
+        })
+      } catch (error) {
+        console.error(
+          'Failed to send message, removing optimistic message.',
+          error
+        )
+        // If the API call fails, alert the user
+        setMessages((currentMessages) =>
+          currentMessages.filter((m) => m.id !== optimisticMessage.id)
+        )
+        // Re-throw the error so the calling component can handle it
+        throw error
+      }
+    },
+    [isAuthenticated, getAccessTokenSilently, user]
+  )
 
   useEffect(() => {
     fetchChatHistory()
@@ -109,11 +130,38 @@ export function useChatApi(chatPartnerId: string) {
 
     const pusher = new Pusher(import.meta.env.VITE_PUSHER_KEY, {
       cluster: import.meta.env.VITE_PUSHER_CLUSTER,
-      authEndpoint: '/api/v1/pusher/auth',
-      auth: {
-        headers: {
-          Authorization: `Bearer ${getAccessTokenSilently()}`,
-        },
+      authorizer: (channel) => {
+        return {
+          authorize: async (socketId, callback) => {
+            try {
+              const accessToken = await getAccessTokenSilently({
+                authorizationParams: {
+                  audience: import.meta.env.VITE_AUTH0_AUDIENCE,
+                },
+              })
+              const response = await fetch(`${baseUrl}/pusher/auth`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${accessToken}`,
+                },
+                body: JSON.stringify({
+                  socket_id: socketId,
+                  channel_name: channel.name,
+                }),
+              })
+
+              if (!response.ok) {
+                throw new Error(`Failed to authorize: ${response.status}`)
+              }
+
+              const authData = await response.json()
+              callback(null, authData)
+            } catch (error) {
+              callback(error as Error, null)
+            }
+          },
+        }
       },
     })
 
@@ -121,15 +169,11 @@ export function useChatApi(chatPartnerId: string) {
     const channelName = `private-chat-${sanitizedUserId}`
     const channel = pusher.subscribe(channelName)
 
-    const handleNewMessage = () => {
-      // When a notification comes in, refetch the entire history
-      fetchChatHistory()
-    }
-
-    channel.bind('new-message', handleNewMessage)
+    // When a notification comes in, refetch the entire history
+    channel.bind('new-message', fetchChatHistory)
 
     return () => {
-      channel.unbind('new-message', handleNewMessage)
+      channel.unbind('new-message', fetchChatHistory)
       pusher.unsubscribe(channelName)
     }
   }, [chatPartnerId, user, fetchChatHistory, getAccessTokenSilently])
