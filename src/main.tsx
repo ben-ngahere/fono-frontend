@@ -25,6 +25,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       audience: auth0Audience,
       scope: 'openid profile email',
     }}
+    onRedirectCallback={(appState) => {
+      window.history.replaceState(
+        {},
+        document.title,
+        appState?.returnTo || window.location.pathname
+      )
+    }}
   >
     <BrowserRouter>
       <App />
