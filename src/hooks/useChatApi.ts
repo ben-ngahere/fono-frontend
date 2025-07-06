@@ -128,11 +128,21 @@ export function useChatApi(chatPartnerId: string) {
 
     if (!chatPartnerId || !user) return
 
+    console.log('=== Pusher Debug ===')
+    console.log('User:', user.sub)
+    console.log('Chat Partner:', chatPartnerId)
+
     const pusher = new Pusher(import.meta.env.VITE_PUSHER_KEY, {
       cluster: import.meta.env.VITE_PUSHER_CLUSTER,
       authorizer: (channel) => {
         return {
           authorize: async (socketId, callback) => {
+            console.log(
+              'Authorizing channel:',
+              channel.name,
+              'Socket ID:',
+              socketId
+            )
             try {
               const accessToken = await getAccessTokenSilently({
                 authorizationParams: {
@@ -156,8 +166,10 @@ export function useChatApi(chatPartnerId: string) {
               }
 
               const authData = await response.json()
+              console.log('Authorization successful for channel:', channel.name)
               callback(null, authData)
             } catch (error) {
+              console.error('Authorization failed:', error)
               callback(error as Error, null)
             }
           },
@@ -167,16 +179,42 @@ export function useChatApi(chatPartnerId: string) {
 
     const sanitizedUserId = user.sub?.replace(/\|/g, '_').replace(/\./g, '-')
     const channelName = `private-chat-${sanitizedUserId}`
+    console.log('Subscribing to channel:', channelName)
+
     const channel = pusher.subscribe(channelName)
 
+    channel.bind('pusher:subscription_succeeded', () => {
+      console.log('Successfully subscribed to:', channelName)
+    })
+
+    channel.bind('pusher:subscription_error', (error: unknown) => {
+      console.error('Subscription error:', error)
+    })
+
     // When a notification comes in, refetch the entire history
-    channel.bind('new-message', fetchChatHistory)
+    channel.bind('new-message', function () {
+      console.log('New message event received!')
+      fetchChatHistory()
+    })
+
+    // Store pusher on window for debugging
+    ;(
+      window as unknown as {
+        pusher: typeof pusher
+        pusherChannel: typeof channel
+      }
+    ).pusher = pusher
+    ;(
+      window as unknown as {
+        pusher: typeof pusher
+        pusherChannel: typeof channel
+      }
+    ).pusherChannel = channel
 
     return () => {
-      channel.unbind('new-message', fetchChatHistory)
+      channel.unbind('new-message')
       pusher.unsubscribe(channelName)
     }
   }, [chatPartnerId, user, fetchChatHistory, getAccessTokenSilently])
-
   return { messages, loading, error, sendMessage }
 }
