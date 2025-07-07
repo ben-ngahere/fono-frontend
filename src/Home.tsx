@@ -5,8 +5,8 @@ import { useAuth0 } from '@auth0/auth0-react'
 import ChatList from './components/ChatList'
 import ChatMessages from './components/ChatMessages'
 import MessageInput from './components/MessageInput'
+import DeleteConfirmDialog from './components/DeleteConfirmDialog'
 import type { User } from './hooks/useUsers'
-import type { FormEvent } from 'react'
 
 const Home = () => {
   const { user } = useAuth0()
@@ -15,12 +15,17 @@ const Home = () => {
   const [currentMessage, setCurrentMessage] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [showUserInfo, setShowUserInfo] = useState(false)
+  const [deleteMessageId, setDeleteMessageId] = useState<string | null>(null)
+  const [showClearChat, setShowClearChat] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const {
     messages,
     loading: messagesLoading,
     error,
     sendMessage,
+    deleteMessage,
+    clearChat,
   } = useChatApi(selectedUserId)
 
   const handleUserSelect = (userId: string) => {
@@ -29,7 +34,37 @@ const Home = () => {
     setShowUserInfo(false)
   }
 
-  const handleSendMessage = async (event: FormEvent<HTMLFormElement>) => {
+  const handleDeleteMessage = async (messageId: string) => {
+    setDeleteMessageId(messageId)
+  }
+
+  const confirmDeleteMessage = async () => {
+    if (!deleteMessageId) return
+
+    setIsDeleting(true)
+    try {
+      await deleteMessage(deleteMessageId)
+      setDeleteMessageId(null)
+    } catch (error) {
+      console.error('Failed to delete message:', error)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleClearChat = async () => {
+    setIsDeleting(true)
+    try {
+      await clearChat()
+      setShowClearChat(false)
+    } catch (error) {
+      console.error('Failed to clear chat:', error)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleSendMessage = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!currentMessage.trim() || !selectedUserId) return
 
@@ -41,7 +76,7 @@ const Home = () => {
       setCurrentMessage('')
     } catch (err) {
       console.error('Failed to send message:', err)
-      // In production, show user-friendly error notification
+      // Optionally show a user-friendly error notification
     }
   }
 
@@ -95,6 +130,7 @@ const Home = () => {
             selectedUser={selectedUser}
             loading={messagesLoading}
             error={error}
+            onDeleteMessage={handleDeleteMessage}
           />
 
           {/* Input */}
@@ -123,8 +159,29 @@ const Home = () => {
         <UserInfoSidebar
           user={selectedUser}
           onClose={() => setShowUserInfo(false)}
+          onClearChat={() => setShowClearChat(true)}
         />
       )}
+
+      {/* Delete Message Confirmation */}
+      <DeleteConfirmDialog
+        isOpen={!!deleteMessageId}
+        title="Delete Message?"
+        message="This message will be permanently deleted."
+        onConfirm={confirmDeleteMessage}
+        onCancel={() => setDeleteMessageId(null)}
+        isDeleting={isDeleting}
+      />
+
+      {/* Clear Chat Confirmation */}
+      <DeleteConfirmDialog
+        isOpen={showClearChat}
+        title="Clear Chat History?"
+        message="All messages in this conversation will be permanently deleted. This cannot be undone."
+        onConfirm={handleClearChat}
+        onCancel={() => setShowClearChat(false)}
+        isDeleting={isDeleting}
+      />
     </div>
   )
 }
@@ -204,9 +261,10 @@ const ChatHeader = ({
 interface UserInfoSidebarProps {
   user: User
   onClose: () => void
+  onClearChat?: () => void
 }
 
-const UserInfoSidebar = ({ user }: UserInfoSidebarProps) => (
+const UserInfoSidebar = ({ user, onClearChat }: UserInfoSidebarProps) => (
   <div className="w-80 bg-white/10 backdrop-blur-md rounded-2xl p-6 space-y-6">
     <div className="text-center">
       {user.avatar_url ? (
@@ -237,6 +295,15 @@ const UserInfoSidebar = ({ user }: UserInfoSidebarProps) => (
         <i className="fas fa-search mr-2" aria-hidden="true"></i> Search in
         Conversation
       </button>
+      {onClearChat && (
+        <button
+          onClick={onClearChat}
+          className="w-full p-3 bg-red-500/20 hover:bg-red-500/30 rounded-xl text-red-300 transition"
+        >
+          <i className="fas fa-trash-alt mr-2" aria-hidden="true"></i> Clear
+          Chat History
+        </button>
+      )}
     </div>
   </div>
 )

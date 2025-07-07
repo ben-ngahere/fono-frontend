@@ -251,5 +251,35 @@ export function useChatApi(chatPartnerId: string) {
     [isAuthenticated, getAccessTokenSilently, setMessages]
   )
 
-  return { messages, loading, error, sendMessage, deleteMessage }
+  // Add clearChat implementation
+  const clearChat = useCallback(async () => {
+    if (!isAuthenticated || !chatPartnerId) {
+      throw new Error('User not authenticated or no chat selected.')
+    }
+    try {
+      const accessToken = await getAccessTokenSilently({
+        authorizationParams: {
+          audience: import.meta.env.VITE_AUTH0_AUDIENCE,
+        },
+      })
+      const response = await fetch(
+        `${baseUrl}/chat_messages?participantId=${chatPartnerId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      )
+      if (!response.ok) {
+        throw new Error('Failed to clear chat')
+      }
+      setMessages([])
+    } catch (error) {
+      console.error('Failed to clear chat:', error)
+      throw error
+    }
+  }, [isAuthenticated, chatPartnerId, getAccessTokenSilently])
+
+  return { messages, loading, error, sendMessage, deleteMessage, clearChat }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { User } from '../hooks/useUsers'
 import { formatTime } from '../utils/dateHelpers'
 
@@ -18,6 +18,7 @@ interface ChatMessagesProps {
   selectedUser: User | undefined
   loading: boolean
   error?: Error | null
+  onDeleteMessage?: (messageId: string) => void
 }
 
 const ChatMessages = ({
@@ -26,13 +27,45 @@ const ChatMessages = ({
   selectedUser,
   loading,
   error,
+  onDeleteMessage,
 }: ChatMessagesProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(
+    null
+  )
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Auto-scroll to bottom
+  // Handle long press for mobile
+  const handleTouchStart = (messageId: string, isSentByMe: boolean) => {
+    if (!isSentByMe) return
+
+    longPressTimer.current = setTimeout(() => {
+      setSelectedMessageId(messageId)
+    }, 500) // 500ms long press
+  }
+
+  const handleTouchEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }
+
+  const handleDeleteClick = (messageId: string) => {
+    if (onDeleteMessage) {
+      onDeleteMessage(messageId)
+    }
+    setSelectedMessageId(null)
+  }
+
+  // Close menu when clicking outside
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    const handleClickOutside = () => setSelectedMessageId(null)
+    if (selectedMessageId) {
+      document.addEventListener('click', handleClickOutside)
+      return () => document.removeEventListener('click', handleClickOutside)
+    }
+  }, [selectedMessageId])
 
   if (loading) {
     return (
@@ -114,7 +147,11 @@ const ChatMessages = ({
                     isSentByMe ? 'items-end' : 'items-start'
                   } max-w-[70%]`}
                 >
-                  <div className="relative">
+                  <div
+                    className="relative"
+                    onTouchStart={() => handleTouchStart(msg.id, isSentByMe)}
+                    onTouchEnd={handleTouchEnd}
+                  >
                     <div
                       className={`px-4 py-2 ${
                         isSentByMe
@@ -124,6 +161,39 @@ const ChatMessages = ({
                     >
                       <p className="break-words">{msg.content}</p>
                     </div>
+
+                    {/* Delete button for desktop hover */}
+                    {isSentByMe && onDeleteMessage && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedMessageId(msg.id)
+                        }}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 shadow-lg flex items-center justify-center"
+                        aria-label="Delete message"
+                      >
+                        <i
+                          className="fas fa-trash text-xs"
+                          aria-hidden="true"
+                        ></i>
+                      </button>
+                    )}
+
+                    {/* Context menu for selected message */}
+                    {selectedMessageId === msg.id && (
+                      <div className="absolute top-full right-0 mt-1 bg-white rounded-lg shadow-lg py-1 z-10 min-w-[120px]">
+                        <button
+                          onClick={() => handleDeleteClick(msg.id)}
+                          className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center gap-2"
+                        >
+                          <i
+                            className="fas fa-trash text-sm"
+                            aria-hidden="true"
+                          ></i>
+                          Delete
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
