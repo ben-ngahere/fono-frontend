@@ -216,5 +216,40 @@ export function useChatApi(chatPartnerId: string) {
       pusher.unsubscribe(channelName)
     }
   }, [chatPartnerId, user, fetchChatHistory, getAccessTokenSilently])
-  return { messages, loading, error, sendMessage }
+
+  const deleteMessage = useCallback(
+    async (messageId: string) => {
+      if (!isAuthenticated) {
+        throw new Error('User not authenticated to delete message.')
+      }
+
+      try {
+        const accessToken = await getAccessTokenSilently({
+          authorizationParams: {
+            audience: import.meta.env.VITE_AUTH0_AUDIENCE,
+          },
+        })
+
+        const response = await fetch(`${baseUrl}/chat_messages/${messageId}`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to delete message')
+        }
+
+        // Remove from local state
+        setMessages((current) => current.filter((msg) => msg.id !== messageId))
+      } catch (error) {
+        console.error('Failed to delete message:', error)
+        throw error
+      }
+    },
+    [isAuthenticated, getAccessTokenSilently, setMessages]
+  )
+
+  return { messages, loading, error, sendMessage, deleteMessage }
 }

@@ -2,9 +2,12 @@ import { Routes, Route } from 'react-router-dom'
 import Home from './Home'
 import Loading from './Loading'
 import ErrorPage from './ErrorPage'
-import AppLayout from './components/AppLayout'
 import './App.css'
 import ProtectedRoute from './components/ProtectedRoute'
+import Dashboard from './components/Dashboard'
+import PageTransition from './components/PageTransition'
+import PageWrapper from './components/PageWrapper'
+import SettingsPage from './components/SettingsPage'
 
 // Placeholder components for future features
 const MediaPage = () => (
@@ -56,9 +59,21 @@ function App() {
         path="/"
         element={
           <ProtectedRoute>
-            <AppLayout>
-              <Home />
-            </AppLayout>
+            <PageTransition>
+              <Dashboard />
+            </PageTransition>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/chat"
+        element={
+          <ProtectedRoute>
+            <PageTransition>
+              <PageWrapper title="Family Chat">
+                <Home />
+              </PageWrapper>
+            </PageTransition>
           </ProtectedRoute>
         }
       />
@@ -66,9 +81,11 @@ function App() {
         path="/media"
         element={
           <ProtectedRoute>
-            <AppLayout>
-              <MediaPage />
-            </AppLayout>
+            <PageTransition>
+              <PageWrapper title="Media">
+                <MediaPage />
+              </PageWrapper>
+            </PageTransition>
           </ProtectedRoute>
         }
       />
@@ -76,9 +93,11 @@ function App() {
         path="/documents"
         element={
           <ProtectedRoute>
-            <AppLayout>
-              <DocumentsPage />
-            </AppLayout>
+            <PageTransition>
+              <PageWrapper title="Documents">
+                <DocumentsPage />
+              </PageWrapper>
+            </PageTransition>
           </ProtectedRoute>
         }
       />
@@ -86,9 +105,11 @@ function App() {
         path="/stream"
         element={
           <ProtectedRoute>
-            <AppLayout>
-              <StreamPage />
-            </AppLayout>
+            <PageTransition>
+              <PageWrapper title="Stream">
+                <StreamPage />
+              </PageWrapper>
+            </PageTransition>
           </ProtectedRoute>
         }
       />
@@ -96,12 +117,27 @@ function App() {
         path="/vault"
         element={
           <ProtectedRoute>
-            <AppLayout>
-              <VaultPage />
-            </AppLayout>
+            <PageTransition>
+              <PageWrapper title="Vault">
+                <VaultPage />
+              </PageWrapper>
+            </PageTransition>
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <PageTransition>
+              <PageWrapper title="Settings">
+                <SettingsPage />
+              </PageWrapper>
+            </PageTransition>
+          </ProtectedRoute>
+        }
+      />
+
       <Route path="/loading" element={<Loading />} />
       <Route
         path="/error"
