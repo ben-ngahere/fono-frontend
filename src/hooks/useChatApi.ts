@@ -21,11 +21,19 @@ interface Message {
   readStatus: boolean
 }
 
+// Interface for clear chat progress
+interface ClearChatProgress {
+  deleted: number
+  total: number
+  errors: string[]
+}
+
 export function useChatApi(chatPartnerId: string) {
   const { getAccessTokenSilently, isAuthenticated, user } = useAuth0()
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+  const [clearingChat, setClearingChat] = useState(false)
 
   const fetchChatHistory = useCallback(async () => {
     if (!isAuthenticated || !chatPartnerId) return
@@ -251,35 +259,157 @@ export function useChatApi(chatPartnerId: string) {
     [isAuthenticated, getAccessTokenSilently, setMessages]
   )
 
-  // Add clearChat implementation
-  const clearChat = useCallback(async () => {
+  const clearChat = useCallback(
+    async (
+      onProgress?: (progress: ClearChatProgress) => void
+    ): Promise<{
+      success: boolean
+      deleted: number
+      errors: string[]
+    }> => {
+      if (!isAuthenticated || !chatPartnerId) {
+        throw new Error('User not authenticated or no chat selected.')
+      }
+
+      setClearingChat(true)
+      const errors: string[] = []
+      let deletedCount = 0
+
+      try {
+        const accessToken = await getAccessTokenSilently({
+          authorizationParams: {
+            audience: import.meta.env.VITE_AUTH0_AUDIENCE,
+          },
+        })
+
+        // Get current messages to delete
+        const messagesToDelete = messages
+        const totalMessages = messagesToDelete.length
+
+        if (totalMessages === 0) {
+          setClearingChat(false)
+          return { success: true, deleted: 0, errors: [] }
+        }
+
+        // Initial progress callback
+        onProgress?.({
+          deleted: 0,
+          total: totalMessages,
+          errors: [],
+        })
+
+        // Delete messages sequentially to avoid overwhelming the server
+        for (const message of messagesToDelete) {
+          try {
+            const response = await fetch(
+              `${baseUrl}/chat_messages/${message.id}`,
+              {
+                method: 'DELETE',
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                },
+              }
+            )
+
+            if (!response.ok) {
+              const errorMsg = `Failed to delete message ${message.id}: ${response.status}`
+              errors.push(errorMsg)
+              console.error(errorMsg)
+            } else {
+              deletedCount++
+              // Remove from local state immediately
+              setMessages((current) =>
+                current.filter((msg) => msg.id !== message.id)
+              )
+            }
+          } catch (error) {
+            const errorMsg = `Error deleting message ${message.id}: ${error}`
+            errors.push(errorMsg)
+            console.error(errorMsg)
+          }
+
+          // Update progress
+          onProgress?.({
+            deleted: deletedCount,
+            total: totalMessages,
+            errors: [...errors],
+          })
+
+          // Small delay to avoid rate limiting
+          await new Promise((resolve) => setTimeout(resolve, 50))
+        }
+
+        console.log(
+          `Chat clear completed: ${deletedCount}/${totalMessages} messages deleted`
+        )
+
+        return {
+          success: errors.length === 0,
+          deleted: deletedCount,
+          errors,
+        }
+      } catch (error) {
+        const errorMsg = `Failed to clear chat: ${error}`
+        console.error(errorMsg)
+        return {
+          success: false,
+          deleted: deletedCount,
+          errors: [errorMsg],
+        }
+      } finally {
+        setClearingChat(false)
+      }
+    },
+    [isAuthenticated, chatPartnerId, getAccessTokenSilently, messages]
+  )
+
+  // Clear only user's own messages (original functionality)
+  const clearMyMessages = useCallback(async () => {
     if (!isAuthenticated || !chatPartnerId) {
       throw new Error('User not authenticated or no chat selected.')
     }
+
     try {
       const accessToken = await getAccessTokenSilently({
         authorizationParams: {
           audience: import.meta.env.VITE_AUTH0_AUDIENCE,
         },
       })
-      const response = await fetch(
-        `${baseUrl}/chat_messages?participantId=${chatPartnerId}`,
-        {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
+
+      // Delete only user's messages
+      const messagesToDelete = messages.filter(
+        (msg) => msg.senderId === user?.sub
       )
-      if (!response.ok) {
-        throw new Error('Failed to clear chat')
-      }
-      setMessages([])
+
+      await Promise.all(
+        messagesToDelete.map((msg) =>
+          fetch(`${baseUrl}/chat_messages/${msg.id}`, {
+            method: 'DELETE',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          })
+        )
+      )
+
+      // Remove only the user's messages from local state
+      setMessages((current) =>
+        current.filter((msg) => msg.senderId !== user?.sub)
+      )
     } catch (error) {
-      console.error('Failed to clear chat:', error)
+      console.error('Failed to clear user messages:', error)
       throw error
     }
-  }, [isAuthenticated, chatPartnerId, getAccessTokenSilently])
+  }, [isAuthenticated, chatPartnerId, getAccessTokenSilently, messages, user])
 
-  return { messages, loading, error, sendMessage, deleteMessage, clearChat }
+  return {
+    messages,
+    loading,
+    error,
+    clearingChat,
+    sendMessage,
+    deleteMessage,
+    clearChat,
+    clearMyMessages,
+  }
 }

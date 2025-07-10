@@ -151,3 +151,14 @@ body {
 .message-bubble {
   position: relative;
 }
+
+/* Force hover visibility for delete button */
+.group:hover .delete-button,
+.group:hover button[aria-label='Delete message'] {
+  opacity: 1 !important;
+}
+
+/* Ensure relative positioning */
+.message-container {
+  position: relative;
+}
