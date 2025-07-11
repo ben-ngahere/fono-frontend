@@ -107,9 +107,6 @@ const ChatList = ({
                 <h3 className="font-semibold text-white truncate">
                   {familyMember.display_name}
                 </h3>
-                <p className="text-sm text-white/60 truncate">
-                  Click to start chatting
-                </p>
               </div>
               <div className="text-right">
                 <p className="text-xs text-white/60">

@@ -107,7 +107,6 @@ const ChatMessages = ({
         <div className="text-center text-white/60 py-12">
           <i className="fas fa-comments text-5xl mb-4" aria-hidden="true"></i>
           <p className="text-lg">No messages yet</p>
-          <p className="text-sm">Say kia ora to start the conversation! 👋</p>
         </div>
       </div>
     )
@@ -122,6 +121,15 @@ const ChatMessages = ({
           const isFirstInGroup =
             !previousMessage || previousMessage.senderId !== msg.senderId
           const showName = !isSentByMe && isFirstInGroup
+
+          console.log('Message debug:')
+          console.log('  messageId:', msg.id)
+          console.log('  senderId:', msg.senderId)
+          console.log('  currentUserId:', currentUserId)
+          console.log('  isSentByMe:', isSentByMe)
+          console.log('  content:', msg.content.substring(0, 20) + '...')
+          console.log('  onDeleteMessage exists:', !!onDeleteMessage)
+          console.log('  ---')
 
           return (
             <div key={msg.id} className={`${isFirstInGroup ? 'mt-4' : 'mt-1'}`}>
@@ -174,7 +182,7 @@ const ChatMessages = ({
                       <p className="break-words">{msg.content}</p>
                     </div>
 
-                    {/* Delete button for desktop hover */}
+                    {/* Delete button: desktop hover */}
                     {isSentByMe && onDeleteMessage && (
                       <button
                         onClick={(e) => {
@@ -191,7 +199,7 @@ const ChatMessages = ({
                       </button>
                     )}
 
-                    {/* Context menu for selected message */}
+                    {/* Menu: selected message */}
                     {selectedMessageId === msg.id && (
                       <div className="absolute top-full right-0 mt-1 bg-white rounded-lg shadow-lg py-1 z-10 min-w-[120px]">
                         <button

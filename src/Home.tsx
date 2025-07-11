@@ -148,9 +148,9 @@ const Home = () => {
           <div className="text-center text-white/60">
             <i className="fas fa-comments text-6xl mb-4" aria-hidden="true"></i>
             <h2 className="text-2xl font-semibold text-white mb-2">
-              Welcome to Family Chat
+              Welcome to Chat
             </h2>
-            <p>Select a conversation to start messaging</p>
+            <p>Select a conversation to start chatting</p>
           </div>
         </div>
       )}

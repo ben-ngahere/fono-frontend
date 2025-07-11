@@ -70,7 +70,7 @@ function App() {
         element={
           <ProtectedRoute>
             <PageTransition>
-              <PageWrapper title="Family Chat">
+              <PageWrapper title="Chat">
                 <Home />
               </PageWrapper>
             </PageTransition>
