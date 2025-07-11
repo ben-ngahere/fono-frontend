@@ -1,10 +1,13 @@
 import type { FormEvent } from 'react'
+import { useRef, useCallback } from 'react'
 
 interface MessageInputProps {
   value: string
   onChange: (value: string) => void
   onSubmit: (e: FormEvent<HTMLFormElement>) => void
   disabled?: boolean
+  onTypingStart?: () => void
+  onTypingStop?: () => void
 }
 
 const MessageInput = ({
@@ -12,7 +15,61 @@ const MessageInput = ({
   onChange,
   onSubmit,
   disabled = false,
+  onTypingStart,
+  onTypingStop,
 }: MessageInputProps) => {
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isTypingRef = useRef(false)
+
+  // Handle typing detection
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newValue = e.target.value
+      onChange(newValue)
+
+      // If user starts typing and wasn't already typing
+      if (!isTypingRef.current && newValue.trim()) {
+        isTypingRef.current = true
+        onTypingStart?.()
+        console.log('🟢 Started typing')
+      }
+
+      // Clear existing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current)
+      }
+
+      // Set new timeout to stop typing after 3 seconds of inactivity
+      if (newValue.trim()) {
+        typingTimeoutRef.current = setTimeout(() => {
+          isTypingRef.current = false
+          onTypingStop?.()
+          console.log('🔴 Stopped typing (timeout)')
+        }, 3000)
+      } else {
+        // If input is empty, stop typing immediately
+        isTypingRef.current = false
+        onTypingStop?.()
+        console.log('🔴 Stopped typing (empty)')
+      }
+    },
+    [onChange, onTypingStart, onTypingStop]
+  )
+
+  // Handle form submission - stop typing immediately
+  const handleSubmit = useCallback(
+    (e: FormEvent<HTMLFormElement>) => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current)
+      }
+      isTypingRef.current = false
+      onTypingStop?.()
+      console.log('🔴 Stopped typing (message sent)')
+      onSubmit(e)
+    },
+    [onSubmit, onTypingStop]
+  )
+
   const handleKeyPress = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
@@ -25,7 +82,7 @@ const MessageInput = ({
 
   return (
     <div className="p-4 border-t border-white/20">
-      <form onSubmit={onSubmit} className="flex items-center gap-2">
+      <form onSubmit={handleSubmit} className="flex items-center gap-2">
         <button
           type="button"
           className="p-3 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition"
@@ -39,7 +96,7 @@ const MessageInput = ({
             type="text"
             placeholder="Type a message..."
             value={value}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={handleInputChange}
             onKeyDown={handleKeyPress}
             disabled={disabled}
             className="w-full px-5 py-3 pr-24 rounded-full bg-white/10 backdrop-blur-md text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/30 disabled:opacity-50"

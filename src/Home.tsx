@@ -18,6 +18,7 @@ const Home = () => {
   const [deleteMessageId, setDeleteMessageId] = useState<string | null>(null)
   const [showClearChat, setShowClearChat] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isUserTyping, setIsUserTyping] = useState(false)
 
   const {
     messages,
@@ -80,6 +81,16 @@ const Home = () => {
     }
   }
 
+  const handleTypingStart = () => {
+    setIsUserTyping(true)
+    console.log('User started typing') // Debug log
+  }
+
+  const handleTypingStop = () => {
+    setIsUserTyping(false)
+    console.log('User stopped typing') // Debug log
+  }
+
   // Filtered users based on search
   const filteredUsers = useMemo(() => {
     return otherUsers.filter((user) =>
@@ -132,7 +143,6 @@ const Home = () => {
             loading={messagesLoading}
             error={error}
             onDeleteMessage={handleDeleteMessage}
-            // isOtherUserTyping={true}
           />
 
           {/* Input */}
@@ -141,6 +151,8 @@ const Home = () => {
             onChange={setCurrentMessage}
             onSubmit={handleSendMessage}
             disabled={!selectedUserId}
+            onTypingStart={handleTypingStart}
+            onTypingStop={handleTypingStop}
           />
         </div>
       ) : (
