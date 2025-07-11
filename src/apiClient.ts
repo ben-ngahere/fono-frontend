@@ -1,6 +1,6 @@
 import { useAuth0 } from '@auth0/auth0-react'
 
-const baseUrl = '/api/v1'
+const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/v1'
 
 // Public Greeting
 export async function getGreeting(): Promise<string> {

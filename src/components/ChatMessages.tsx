@@ -16,6 +16,7 @@ interface ChatMessagesProps {
   messages: Message[]
   currentUserId?: string
   selectedUser: User | undefined
+  users: User[]
   loading: boolean
   error?: Error | null
   onDeleteMessage?: (messageId: string) => void
@@ -25,6 +26,7 @@ const ChatMessages = ({
   messages,
   currentUserId,
   selectedUser,
+  users,
   loading,
   error,
   onDeleteMessage,
@@ -35,13 +37,23 @@ const ChatMessages = ({
   )
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Helper function to get display name for any user
+  const getUserDisplayName = (userId: string): string => {
+    if (userId === currentUserId) {
+      return 'You'
+    }
+
+    const user = users.find((u) => u.user_id === userId)
+    return user?.display_name || 'User'
+  }
+
   // Handle long press for mobile
   const handleTouchStart = (messageId: string, isSentByMe: boolean) => {
     if (!isSentByMe) return
 
     longPressTimer.current = setTimeout(() => {
       setSelectedMessageId(messageId)
-    }, 500) // 500ms long press
+    }, 500)
   }
 
   const handleTouchEnd = () => {
@@ -115,7 +127,7 @@ const ChatMessages = ({
             <div key={msg.id} className={`${isFirstInGroup ? 'mt-4' : 'mt-1'}`}>
               {showName && (
                 <p className="text-xs text-white/60 mb-1 ml-10">
-                  {selectedUser?.display_name?.split(' ')[0] || 'User'}
+                  {getUserDisplayName(msg.senderId)}
                 </p>
               )}
               <div
