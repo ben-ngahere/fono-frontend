@@ -128,6 +128,7 @@ const Home = () => {
             messages={messages}
             currentUserId={user?.sub}
             selectedUser={selectedUser}
+            users={otherUsers}
             loading={messagesLoading}
             error={error}
             onDeleteMessage={handleDeleteMessage}
