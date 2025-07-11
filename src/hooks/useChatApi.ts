@@ -4,13 +4,13 @@ import Pusher from 'pusher-js'
 
 const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/v1'
 
-// Interface for the message payload
+// Message
 interface MessagePayload {
   receiverId: string | null
   content: string
 }
 
-// Interface for history
+// History
 interface Message {
   id: string
   senderId: string
@@ -21,7 +21,7 @@ interface Message {
   readStatus: boolean
 }
 
-// Interface for clear chat progress
+// Chat Progress
 interface ClearChatProgress {
   deleted: number
   total: number
@@ -34,6 +34,7 @@ export function useChatApi(chatPartnerId: string) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
   const [clearingChat, setClearingChat] = useState(false)
+  const [isOtherUserTyping, setIsOtherUserTyping] = useState(false) // ← Add typing state
 
   const fetchChatHistory = useCallback(async () => {
     if (!isAuthenticated || !chatPartnerId) return
@@ -76,6 +77,59 @@ export function useChatApi(chatPartnerId: string) {
     }
   }, [isAuthenticated, chatPartnerId, getAccessTokenSilently, messages.length])
 
+  // Typing functions
+  const sendTypingStart = useCallback(async () => {
+    if (!isAuthenticated || !user || !chatPartnerId) return
+
+    try {
+      const accessToken = await getAccessTokenSilently({
+        authorizationParams: {
+          audience: import.meta.env.VITE_AUTH0_AUDIENCE,
+        },
+      })
+
+      await fetch(`${baseUrl}/pusher/typing`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          action: 'start',
+          targetUserId: chatPartnerId,
+        }),
+      })
+    } catch (error) {
+      console.error('Failed to send typing start event:', error)
+    }
+  }, [isAuthenticated, user, chatPartnerId, getAccessTokenSilently])
+
+  const sendTypingStop = useCallback(async () => {
+    if (!isAuthenticated || !user || !chatPartnerId) return
+
+    try {
+      const accessToken = await getAccessTokenSilently({
+        authorizationParams: {
+          audience: import.meta.env.VITE_AUTH0_AUDIENCE,
+        },
+      })
+
+      await fetch(`${baseUrl}/pusher/typing`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          action: 'stop',
+          targetUserId: chatPartnerId,
+        }),
+      })
+    } catch (error) {
+      console.error('Failed to send typing stop event:', error)
+    }
+  }, [isAuthenticated, user, chatPartnerId, getAccessTokenSilently])
+
   const sendMessage = useCallback(
     async (message: MessagePayload) => {
       if (!isAuthenticated || !user) {
@@ -93,7 +147,7 @@ export function useChatApi(chatPartnerId: string) {
         readStatus: false,
       }
 
-      // Update the UI instantly
+      // Update UI instantly
       setMessages((currentMessages) => [...currentMessages, optimisticMessage])
 
       // Send the real message to the server in the background
@@ -205,7 +259,18 @@ export function useChatApi(chatPartnerId: string) {
       fetchChatHistory()
     })
 
-    // Store pusher on window for debugging
+    // Typing event listeners
+    channel.bind('user-typing-start', function (data: any) {
+      console.log('🟢 Received typing start event:', data)
+      setIsOtherUserTyping(true)
+    })
+
+    channel.bind('user-typing-stop', function (data: any) {
+      console.log('🔴 Received typing stop event:', data)
+      setIsOtherUserTyping(false)
+    })
+
+    // Pusher window for debugging
     ;(
       window as unknown as {
         pusher: typeof pusher
@@ -221,6 +286,8 @@ export function useChatApi(chatPartnerId: string) {
 
     return () => {
       channel.unbind('new-message')
+      channel.unbind('user-typing-start')
+      channel.unbind('user-typing-stop')
       pusher.unsubscribe(channelName)
     }
   }, [chatPartnerId, user, fetchChatHistory, getAccessTokenSilently])
@@ -363,7 +430,7 @@ export function useChatApi(chatPartnerId: string) {
     [isAuthenticated, chatPartnerId, getAccessTokenSilently, messages]
   )
 
-  // Clear only user's own messages (original functionality)
+  // Clear only users own messages
   const clearMyMessages = useCallback(async () => {
     if (!isAuthenticated || !chatPartnerId) {
       throw new Error('User not authenticated or no chat selected.')
@@ -376,7 +443,7 @@ export function useChatApi(chatPartnerId: string) {
         },
       })
 
-      // Delete only user's messages
+      // Delete only users messages
       const messagesToDelete = messages.filter(
         (msg) => msg.senderId === user?.sub
       )
@@ -392,7 +459,7 @@ export function useChatApi(chatPartnerId: string) {
         )
       )
 
-      // Remove only the user's messages from local state
+      // Remove only the users messages from local state
       setMessages((current) =>
         current.filter((msg) => msg.senderId !== user?.sub)
       )
@@ -407,7 +474,10 @@ export function useChatApi(chatPartnerId: string) {
     loading,
     error,
     clearingChat,
+    isOtherUserTyping,
     sendMessage,
+    sendTypingStart,
+    sendTypingStop,
     deleteMessage,
     clearChat,
     clearMyMessages,

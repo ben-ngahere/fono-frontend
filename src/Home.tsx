@@ -24,7 +24,10 @@ const Home = () => {
     messages,
     loading: messagesLoading,
     error,
+    isOtherUserTyping,
     sendMessage,
+    sendTypingStart,
+    sendTypingStop,
     deleteMessage,
     clearChat,
   } = useChatApi(selectedUserId)
@@ -77,18 +80,19 @@ const Home = () => {
       setCurrentMessage('')
     } catch (err) {
       console.error('Failed to send message:', err)
-      // Optionally show a user-friendly error notification
     }
   }
 
   const handleTypingStart = () => {
     setIsUserTyping(true)
-    console.log('User started typing') // Debug log
+    sendTypingStart()
+    console.log('✅ User started typing - notified other person via Pusher')
   }
 
   const handleTypingStop = () => {
     setIsUserTyping(false)
-    console.log('User stopped typing') // Debug log
+    sendTypingStop()
+    console.log('❌ User stopped typing - notified other person via Pusher')
   }
 
   // Filtered users based on search
@@ -143,6 +147,7 @@ const Home = () => {
             loading={messagesLoading}
             error={error}
             onDeleteMessage={handleDeleteMessage}
+            isOtherUserTyping={isOtherUserTyping}
           />
 
           {/* Input */}
