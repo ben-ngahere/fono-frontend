@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { User } from '../hooks/useUsers'
 import { formatTime } from '../utils/dateHelpers'
+import TypingIndicator from './TypingIndicator'
 
 interface Message {
   id: string
@@ -20,6 +21,7 @@ interface ChatMessagesProps {
   loading: boolean
   error?: Error | null
   onDeleteMessage?: (messageId: string) => void
+  isOtherUserTyping?: boolean
 }
 
 const ChatMessages = ({
@@ -30,6 +32,7 @@ const ChatMessages = ({
   loading,
   error,
   onDeleteMessage,
+  isOtherUserTyping = false,
 }: ChatMessagesProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(
@@ -121,15 +124,6 @@ const ChatMessages = ({
           const isFirstInGroup =
             !previousMessage || previousMessage.senderId !== msg.senderId
           const showName = !isSentByMe && isFirstInGroup
-
-          console.log('Message debug:')
-          console.log('  messageId:', msg.id)
-          console.log('  senderId:', msg.senderId)
-          console.log('  currentUserId:', currentUserId)
-          console.log('  isSentByMe:', isSentByMe)
-          console.log('  content:', msg.content.substring(0, 20) + '...')
-          console.log('  onDeleteMessage exists:', !!onDeleteMessage)
-          console.log('  ---')
 
           return (
             <div key={msg.id} className={`${isFirstInGroup ? 'mt-4' : 'mt-1'}`}>
@@ -233,6 +227,13 @@ const ChatMessages = ({
           )
         })}
       </div>
+
+      {/* Add typing indicator here */}
+      <TypingIndicator
+        userName={selectedUser?.display_name}
+        isVisible={isOtherUserTyping}
+      />
+
       <div ref={messagesEndRef} />
     </div>
   )

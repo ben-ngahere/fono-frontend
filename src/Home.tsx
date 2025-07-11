@@ -132,6 +132,7 @@ const Home = () => {
             loading={messagesLoading}
             error={error}
             onDeleteMessage={handleDeleteMessage}
+            // isOtherUserTyping={true}
           />
 
           {/* Input */}
