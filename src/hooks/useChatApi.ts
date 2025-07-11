@@ -34,7 +34,7 @@ export function useChatApi(chatPartnerId: string) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
   const [clearingChat, setClearingChat] = useState(false)
-  const [isOtherUserTyping, setIsOtherUserTyping] = useState(false) // ← Add typing state
+  const [isOtherUserTyping, setIsOtherUserTyping] = useState(false)
 
   const fetchChatHistory = useCallback(async () => {
     if (!isAuthenticated || !chatPartnerId) return
@@ -260,12 +260,12 @@ export function useChatApi(chatPartnerId: string) {
     })
 
     // Typing event listeners
-    channel.bind('user-typing-start', function (data: any) {
+    channel.bind('user-typing-start', function (data: unknown) {
       console.log('🟢 Received typing start event:', data)
       setIsOtherUserTyping(true)
     })
 
-    channel.bind('user-typing-stop', function (data: any) {
+    channel.bind('user-typing-stop', function (data: unknown) {
       console.log('🔴 Received typing stop event:', data)
       setIsOtherUserTyping(false)
     })
