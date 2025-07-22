@@ -125,7 +125,7 @@ I broke everything into small components that do one thing each. Makes it way ea
 - **TypingIndicator** - shows the "..." when someone's typing
 - **Settings components** - each settings section is separate (this was a big refactor!)
 
-The main logic lives in custom hooks (`useChatApi`, `useNotifications`, etc.) so it's reusable and testable.
+The main logic lives in custom hooks so it's reusable and testable.
 
 ## Development 💻
 
@@ -139,7 +139,7 @@ npm run type-check   # TypeScript checking
 ## How the security works 🔒
 
 **Authentication:**
-- Auth0 handles all the login stuff (Google, GitHub, etc.)
+- Auth0 handles all the login stuff
 - Gets you JWT tokens for API access
 - No passwords stored in FONO
 
@@ -175,7 +175,7 @@ After learning about data sovereignty in bootcamp, I realised families shouldn't
 
 It's inspired by the Niuean concept of "FONO" - family meetings where important decisions get made. Those conversations deserve privacy and family control.
 
-This is my first major project after finishing web development bootcamp, and I wanted to build something that actually matters to people.
+This is my first major project after finishing web development bootcamp and I wanted to build something that actually matters to people and me.
 
 ## The design 🎨
 
@@ -233,6 +233,6 @@ MIT License - families and communities can adapt this for their own needs.
 
 ---
 
-FONO is built for families who want control over their digital communication. Every feature is designed to help families stay connected while keeping their conversations private.
+FONO is built for families who want control over their digital communication. Every feature is designed to help stay connected while keeping conversations private.
 
 *Still learning and improving - feedback welcome!* 😊
