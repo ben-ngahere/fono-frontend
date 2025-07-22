@@ -27,8 +27,8 @@
 You'll need:
 - Node.js 18+ 
 - Docker (for the full setup)
-- Auth0 account (free tier is fine)
-- Pusher account (free tier works for families)
+- Auth0 account
+- Pusher account
 
 ### Just the frontend 💻
 
