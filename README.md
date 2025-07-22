@@ -1,6 +1,6 @@
 # FONO Frontend 🏗️
 
-> A family chat app that you actually control. Built with React and TypeScript.
+> A family comms platform that you control. Built with React and TypeScript.
 > 
 > **Work in progress** - actively developing new features and improvements!
 
