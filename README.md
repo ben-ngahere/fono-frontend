@@ -12,8 +12,8 @@
 - **⚡ Real-time chat** - Messages appear instantly with typing indicators  
 - **🔔 Desktop notifications** - Get notified when someone messages you (only when you're not already using the app)
 - **👤 Family-friendly** - Use whatever names make sense for your family (Mum, Dad, Nana, etc.)
-- **🏠 Self-hosted** - Run it on your own hardware, no monthly fees to corporations
-- **📱 Works everywhere** - Phone, tablet, computer - whatever you've got
+- **🏠 Self-hosted** - Run it on your own hardware
+- **📱 Works everywhere** - Phone, tablet, computer etc.
 
 ## Currently working on 🚧
 
