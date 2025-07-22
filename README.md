@@ -97,7 +97,7 @@ VITE_API_URL=http://localhost:3000/v1
 - **Pusher** for real-time messaging
 - **Docker** for easy deployment
 
-### Code organisation 📁
+### File Structure 📁
 
 ```
 src/
