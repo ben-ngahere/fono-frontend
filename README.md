@@ -8,7 +8,7 @@
 
 ## What it does ✨
 
-- **🔐 Actually private messaging** - Your conversations are encrypted and stored on your own server
+- **🔐 Private messaging** - Your conversations are encrypted and stored on your own server
 - **⚡ Real-time chat** - Messages appear instantly with typing indicators  
 - **🔔 Desktop notifications** - Get notified when someone messages you (only when you're not already using the app)
 - **👤 Family-friendly** - Use whatever names make sense for your family (Mum, Dad, Nana, etc.)
@@ -180,7 +180,7 @@ This is my first major project after finishing web development bootcamp, and I w
 ## The design 🎨
 
 - Clean, modern interface that works on all devices
-- Purple theme with glassmorphism effects
+- Glassmorphism effects
 - Designed for all ages - works for grandparents and kids
 - Responsive layout that adapts to screen size
 
